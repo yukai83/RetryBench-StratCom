@@ -1,0 +1,16 @@
+\begin{table}[t]
+\centering
+\caption{Label-masking control: timely fresh delivery (\%, 200 seeds) when the outage cause is visible to the policy (Vis.) or reported as a generic 5xx (Mask.). 45-s deadline, 8\% background errors, unextended outages.}
+\label{tab:mask}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}lrrcrrcrr@{}}\toprule
+ & \multicolumn{2}{c}{IEA} && \multicolumn{2}{c}{LFC} && \multicolumn{2}{c}{CSR}\\
+\cmidrule(lr){2-3}\cmidrule(lr){5-6}\cmidrule(lr){8-9}
+Policy & Vis. & Mask. && Vis. & Mask. && Vis. & Mask.\\\midrule
+Immediate & 25.5 & 25.5 && 13.0 & 13.0 && 27.0 & 27.0\\
+Exponential backoff & 70.5 & 70.5 && 68.0 & 68.0 && 72.0 & 72.0\\
+Cause-aware & 92.0 & 24.5 && 83.0 & 12.5 && 92.0 & 26.5\\
+Linear cooldown & 93.5 & 93.5 && 72.0 & 72.0 && 91.5 & 91.5\\\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,35 @@
+{
+  "status": "post-hoc exploratory diagnostics; frozen configuration unchanged",
+  "frozen_configuration": {
+    "threshold": 3,
+    "short_s": 0.4,
+    "long_s": 2.0,
+    "n": 360,
+    "score": 0.9611111111111111,
+    "mean_calls": 11.397222222222222
+  },
+  "outage_sweep": {
+    "extensions_s": [
+      0.0,
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      6.0
+    ],
+    "seeds": "91000..91199",
+    "trials": 18000
+  },
+  "detector_note": "hidden outage label used only to score controller state, never as policy input",
+  "wide_grid": {
+    "configs": 120,
+    "dev_seeds": "61100..61139",
+    "frozen_config_rank": 1
+  },
+  "slack_guard_total_seed_differences": 0,
+  "sdk_proxy_cap_bound_trials": 12,
+  "sdk_proxy_same_as_exponential_trials": 2996,
+  "sdk_proxy_trials": 3000,
+  "switching_ablation_trials": 18000,
+  "switching_note": "perfect_detection reads the true outage label by design; it is an upper bound, not a deployable policy"
+}

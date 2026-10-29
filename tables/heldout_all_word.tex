@@ -1,0 +1,23 @@
+\begin{table}[t]
+\centering
+\caption{Held-out timely fresh delivery (\%, $N=200$ matched seeds per cell). Deadlines and background errors: IID, 26~s; extended outage, 48~s, 10\% IID; tight, 14~s; hinted quota (2.3 requests/s), 52~s, 9\% IID; mixed, 40~s, 20\% IID and 2\% permanent. Bold: best in the row.}
+\label{tab:main}
+\begin{tabular}{@{}llrrrrr@{}}\toprule
+Workflow & Condition & Imm. & Exp. & SDK & Cool. & Hist.\\\midrule
+IEA & IID 27\% & \textbf{95.0} & 92.5 & 92.5 & 87.0 & 93.0\\
+IEA & Extended outage & 26.0 & 23.0 & 23.0 & \textbf{74.0} & 60.5\\
+IEA & Tight IID 17\% & \textbf{95.0} & 78.5 & 78.5 & 71.5 & 80.5\\
+IEA & Hinted quota & 41.5 & \textbf{99.5} & \textbf{99.5} & 98.0 & 99.0\\
+IEA & Mixed permanent & \textbf{83.5} & 82.5 & 82.5 & 81.0 & 82.5\\
+LFC & IID 27\% & \textbf{95.5} & 89.0 & 89.0 & 81.0 & 87.5\\
+LFC & Extended outage & 16.0 & 18.5 & 18.5 & \textbf{66.0} & 39.5\\
+LFC & Tight IID 17\% & \textbf{91.0} & 76.0 & 76.0 & 65.0 & 81.0\\
+LFC & Hinted quota & \textbf{99.5} & \textbf{99.5} & \textbf{99.5} & 98.5 & \textbf{99.5}\\
+LFC & Mixed permanent & \textbf{84.5} & 82.0 & 81.5 & 79.5 & 82.0\\
+CSR & IID 27\% & \textbf{94.0} & 92.0 & 91.0 & 87.5 & 91.5\\
+CSR & Extended outage & 25.5 & 23.0 & 23.0 & \textbf{75.0} & 51.5\\
+CSR & Tight IID 17\% & \textbf{93.5} & 75.5 & 75.5 & 69.0 & 78.5\\
+CSR & Hinted quota & 0.0 & \textbf{100.0} & \textbf{100.0} & 99.0 & \textbf{100.0}\\
+CSR & Mixed permanent & \textbf{82.0} & 81.5 & 81.0 & 80.0 & 81.5\\\bottomrule
+\end{tabular}
+\end{table}

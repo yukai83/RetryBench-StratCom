@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\caption{Switching ablation: timely fresh delivery (\%, 200 held-out seeds). Short and Long fix the controller's wait at $0.4a$ or $2.0a$~s; Perfect picks between them using the hidden outage label, as an upper bound. Cool.\ and Imm.\ as in Table~\ref{tab:main}. Bold: best in the row.}
+\label{tab:switch}
+\scriptsize
+\setlength{\tabcolsep}{3.2pt}
+\begin{tabular}{@{}llrrrrrr@{}}\toprule
+Condition & & Hist. & Short & Long & Perfect & Cool. & Imm.\\\midrule
+Extended outage & IEA & 60.5 & 23.5 & 70.0 & \textbf{75.0} & 74.0 & 26.0\\
+ & LFC & 39.5 & 14.5 & 48.5 & 57.5 & \textbf{66.0} & 16.0\\
+ & CSR & 51.5 & 22.5 & 64.0 & \textbf{76.0} & 75.0 & 25.5\\
+\addlinespace
+Tight IID 17\% & IEA & 80.5 & 87.0 & 60.0 & 87.0 & 71.5 & \textbf{95.0}\\
+ & LFC & 81.0 & 84.0 & 58.0 & 84.0 & 65.0 & \textbf{91.0}\\
+ & CSR & 78.5 & 84.5 & 62.5 & 84.5 & 69.0 & \textbf{93.5}\\\bottomrule
+\end{tabular}
+\end{table}

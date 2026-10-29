@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retrybench-icngn"
+version = "1.0.0"
+description = "Seeded workflow retry simulation with optional StratCom briefing diagnostics"
+requires-python = ">=3.10"
+authors = [{name = "Research working prototype"}]
+dependencies = []
+
+[project.optional-dependencies]
+plots = ["matplotlib>=3.7"]
+test = ["pytest>=7.4", "numpy>=1.24"]
+study = ["numpy>=1.24", "matplotlib>=3.7"]
+
+[tool.setuptools]
+packages = ["retrybench"]

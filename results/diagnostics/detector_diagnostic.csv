@@ -1,0 +1,12 @@
+scenario,true_cause,scheduled_retries,long_wait_retries,long_wait_pct
+held_iid_27,transient,1875,479,25.5
+held_iid_27,timeout,55,18,32.7
+held_outage_extended,transient,519,36,6.9
+held_outage_extended,timeout,40,6,15.0
+held_outage_extended,outage,1808,1149,63.6
+held_tight_17,transient,1044,145,13.9
+held_tight_17,timeout,40,6,15.0
+held_quota_23,transient,603,49,8.1
+held_quota_23,timeout,49,3,6.1
+held_mixed,transient,1201,217,18.1
+held_mixed,timeout,43,8,18.6

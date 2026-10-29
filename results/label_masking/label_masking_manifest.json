@@ -1,0 +1,28 @@
+{
+  "study": "observable-error challenge to latent outage oracle",
+  "simulation_only": true,
+  "policies": [
+    "immediate",
+    "exponential",
+    "budget_aware",
+    "cooldown_only",
+    "observable_cooldown"
+  ],
+  "scenarios": [
+    "outage_labeled",
+    "outage_hidden_5xx",
+    "iid_tight_15",
+    "iid_medium_20",
+    "rate_limit_hinted"
+  ],
+  "n_per_cell": 200,
+  "cells": 75,
+  "total_trials": 15000,
+  "seeds": [
+    2026,
+    2225
+  ],
+  "paired_bootstrap_resamples": 4000,
+  "policy_interpretation": "outage_hidden_5xx changes only the error label exposed to the policy; ground-truth failure class retained for auditing; observable_cooldown does not use hidden outage labels",
+  "important_limitation": "No external API/LLM evidence or independently measured trace calibration"
+}

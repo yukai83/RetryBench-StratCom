@@ -1,0 +1,29 @@
+{
+  "selection_criterion": "Highest pooled fresh-delivery rate over 3 templates x 3 scenarios x 40 development seeds; tie-break fewer calls",
+  "development_seeds": "61100..61139",
+  "test_seeds": "91000..91199; 140000..140119 for unseen generic DAGs",
+  "frozen_adaptive": {
+    "threshold": 3,
+    "short_s": 0.4,
+    "long_s": 2.0,
+    "n": 360,
+    "score": 0.9611111111111111,
+    "mean_calls": 11.397222222222222
+  },
+  "grid": {
+    "threshold": [
+      2,
+      3
+    ],
+    "short_s": [
+      0.2,
+      0.4
+    ],
+    "long_s": [
+      1.0,
+      1.5,
+      2.0
+    ]
+  },
+  "not_real_world_calibration": true
+}

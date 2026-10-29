@@ -1,0 +1,16 @@
+scenario,template,n,with_guard_pct,without_guard_pct,seeds_differing
+held_iid_27,information_environment_assessment,200,93.0,93.0,0
+held_iid_27,live_fact_check_support,200,87.5,87.5,0
+held_iid_27,communications_situation_report,200,91.5,91.5,0
+held_outage_extended,information_environment_assessment,200,60.5,60.5,0
+held_outage_extended,live_fact_check_support,200,39.5,39.5,0
+held_outage_extended,communications_situation_report,200,51.5,51.5,0
+held_tight_17,information_environment_assessment,200,80.5,80.5,0
+held_tight_17,live_fact_check_support,200,81.0,81.0,0
+held_tight_17,communications_situation_report,200,78.5,78.5,0
+held_quota_23,information_environment_assessment,200,99.0,99.0,0
+held_quota_23,live_fact_check_support,200,99.5,99.5,0
+held_quota_23,communications_situation_report,200,100,100,0
+held_mixed,information_environment_assessment,200,82.5,82.5,0
+held_mixed,live_fact_check_support,200,82.0,82.0,0
+held_mixed,communications_situation_report,200,81.5,81.5,0
