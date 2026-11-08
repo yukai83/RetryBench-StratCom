@@ -27,7 +27,17 @@
     "outage_cause_only_in_outage_regime": true,
     "switching_trial_count": true,
     "switching_adaptive_and_references_match_primary_seed_for_seed": true,
-    "perfect_detection_equals_short_only_without_outages": true
+    "perfect_detection_equals_short_only_without_outages": true,
+    "tradeoff_rows": true,
+    "tradeoff_frozen_rows_match_primary_cells": true,
+    "devgrid_heldout_size": true,
+    "devgrid_rank1_is_frozen_and_matches_primary": true,
+    "load_coupling_count": true,
+    "load_coupling_unique_keys": true,
+    "load_delta0_matches_outage_sweep_seed_for_seed": true,
+    "load_prolongation_is_delta_times_outage_requests": true,
+    "load_summary_recomputed": true,
+    "label_masking_under_load_delta0_matches_table1": true
   },
   "all_pass": true,
   "trials": {
@@ -38,7 +48,11 @@
     "history_window": 3600,
     "outage_sweep": 18000,
     "switching_ablation": 18000,
-    "localhost_http": 320
+    "localhost_http": 320,
+    "threshold_tradeoff": 32400,
+    "devgrid_heldout": 36000,
+    "load_coupling": 36000,
+    "label_masking_under_load": 28800
   },
   "important": "Synthetic simulations only; localhost HTTP uses injected faults, not provider traces"
 }

@@ -1,8 +1,10 @@
 """Paper figures, drawn at final IEEE print width so text is true size.
 
-Fig. 1  figures/workflow_structure.pdf   - IEA task graph, drawn from retrybench.stratcom.TEMPLATES
-Fig. 2  figures/heldout_differences.pdf  - paired contrasts, extended outage and tight deadlines (results/main)
-Fig. 3  figures/outage_duration.pdf      - outage-length sweep, two-column (results/diagnostics)
+Fig. 1  figures/tradeoff.pdf             - threshold trade-off: false alarms vs outage detection (results/diagnostics)
+Fig. 2  figures/outage_duration.pdf      - outage-length sweep, single column (results/diagnostics)
+Supplementary (left the paper in the camera-ready revision, for space):
+        figures/workflow_structure.pdf   - IEA task graph, drawn from retrybench.stratcom.TEMPLATES
+        figures/heldout_differences.pdf  - paired contrasts, extended outage and tight deadlines (results/main)
 """
 from pathlib import Path
 import csv
@@ -40,7 +42,7 @@ def save(fig, name):
     plt.close(fig)
 
 
-# Fig. 1: the IEA task graph exactly as defined in the simulator (layers = longest path from a source).
+# Supplementary figure: the IEA task graph exactly as defined in the simulator (layers = longest path from a source).
 LABELS = {'retrieve_public_feed': 'Retrieve\npublic feed', 'retrieve_official_bulletins': 'Retrieve\nbulletins',
           'normalise_and_deduplicate': 'Normalise,\ndeduplicate', 'extract_observed_topics': 'Extract\ntopics',
           'check_source_provenance': 'Check\nprovenance', 'cross_check_factual_claims': 'Cross-check\nsources',
@@ -78,37 +80,37 @@ ax.axis('off')
 fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
 save(fig, 'workflow_structure')
 
-# Fig. 3: success versus outage extension, small multiples by workflow (two-column figure).
+# Fig. 2: success versus outage extension, small multiples by workflow (single column since the revision).
 rows = read(ROOT / 'results/diagnostics/outage_duration_summary.csv')
-fig, axes = plt.subplots(1, 3, figsize=(7.0, 1.75), sharey=True)
+fig, axes = plt.subplots(1, 3, figsize=(COL_W, 1.55), sharey=True)
 for ax, template in zip(axes, TEMPLATES):
     for pol in ('immediate', 'exponential', 'observable_cooldown', 'history_adaptive'):
         st = STYLE[pol]
         pts = sorted((float(r['extension_s']), float(r['success_pct'])) for r in rows
                      if r['template'] == template and r['policy'] == pol)
-        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=st['color'], ls=st['ls'], lw=st['lw'],
-                marker=st['marker'], ms=3.6, mew=.9, label=st['label'], zorder=3 if pol == 'history_adaptive' else 2)
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=st['color'], ls=st['ls'], lw=st['lw'] * .85,
+                marker=st['marker'], ms=2.8, mew=.8, label=st['label'], zorder=3 if pol == 'history_adaptive' else 2)
     ax.axvline(2, color=MUTED, lw=.6, ls=':', zorder=1)
-    ax.set_title(ABBR[template], fontsize=7.5, color=INK, pad=2)
+    ax.set_title(ABBR[template], fontsize=7, color=INK, pad=1.5)
     ax.set_xticks([0, 2, 4, 6])
     ax.set_xlim(-.4, 6.4)
     ax.set_ylim(0, 100)
     ax.set_yticks([0, 25, 50, 75, 100])
     ax.grid(axis='y', color=GRID, lw=.5)
-    ax.tick_params(length=2, pad=1.5)
+    ax.tick_params(length=2, pad=1.2, labelsize=6.3)
     for side in ('top', 'right'):
         ax.spines[side].set_visible(False)
-axes[0].set_ylabel('Timely fresh delivery (%)')
-axes[1].set_xlabel('Outage-window extension beyond development length (simulated s)')
-axes[0].text(2.15, 97, 'primary\ntest', fontsize=6, color=MUTED, va='top')
+axes[0].set_ylabel('Timely fresh delivery (%)', fontsize=6.8)
+axes[1].set_xlabel('Outage extension beyond development length (s)', fontsize=6.8)
+axes[0].text(2.25, 97, 'primary\ntest', fontsize=5.5, color=MUTED, va='top', linespacing=.9)
 handles, labels = axes[0].get_legend_handles_labels()
 order = [3, 2, 1, 0]
-fig.legend([handles[i] for i in order], [labels[i] for i in order], loc='upper center', ncol=4,
-           frameon=False, bbox_to_anchor=(.53, 1.04), handlelength=2.2, columnspacing=1.6, handletextpad=.5)
-fig.subplots_adjust(wspace=.08, left=.07, right=.995, bottom=.2, top=.84)
+fig.legend([handles[i] for i in order], ['History-adaptive', 'Cooldown', 'Exponential', 'Immediate'], loc='upper center', ncol=4,
+           frameon=False, bbox_to_anchor=(.55, 1.03), handlelength=1.8, columnspacing=.9, handletextpad=.35, fontsize=6.3)
+fig.subplots_adjust(wspace=.1, left=.13, right=.99, bottom=.22, top=.8)
 save(fig, 'outage_duration')
 
-# Fig. 2: paired history-adaptive minus comparator, extended outage (top) and tight deadlines (bottom).
+# Supplementary figure: paired history-adaptive minus comparator, extended outage (top) and tight deadlines (bottom).
 paired = {(r['template'], r['scenario'], r['compared_with']): r
           for r in read(ROOT / 'results/main/heldout_paired_bootstrap.csv') if r['split'] == 'held_out'}
 PANELS = [('held_outage_extended', 'Extended outage', ('exponential', 'observable_cooldown')),
@@ -141,5 +143,69 @@ axes[1].set_xticks([-40, -20, 0, 20, 40])
 axes[1].set_xlabel('History-adaptive minus comparator (percentage points), seed-paired 95% CI')
 fig.subplots_adjust(left=.36, right=.99, bottom=.14, top=.95, hspace=.32)
 save(fig, 'heldout_differences')
+
+# Fig. 1 (revision): the threshold trade-off. Every point pools the three workflows (600 runs per condition).
+trade = read(ROOT / 'results/diagnostics/threshold_tradeoff.csv')
+held = {(r['template'], r['scenario'], r['policy']): float(r['success_pct'])
+        for r in read(ROOT / 'results/main/heldout_summary.csv') if r['split'] == 'held_out'}
+switch = {(r['scenario'], r['template'], r['variant']): float(r['success_pct'])
+          for r in read(ROOT / 'results/diagnostics/switching_ablation_summary.csv')}
+INDEP, OUT_SC = ('held_iid_27', 'held_tight_17'), 'held_outage_extended'
+
+
+def tradeoff_point(k, long, rho=''):
+    rows = {r['scenario']: r for r in trade if (int(r['threshold']), float(r['long_s']), r['failure_rate_rule']) == (k, long, rho)}
+    x = sum(float(rows[s]['success_pct_pooled']) for s in INDEP) / 2
+    return x, float(rows[OUT_SC]['success_pct_pooled']), float(rows['held_iid_27']['long_wait_pct_independent'])
+
+
+def reference_point(get):
+    return (sum(get(s, t) for s in INDEP for t in TEMPLATES) / (2 * len(TEMPLATES)),
+            sum(get(OUT_SC, t) for t in TEMPLATES) / len(TEMPLATES))
+
+
+fig, ax = plt.subplots(figsize=(COL_W, 1.7))
+blue = STYLE['history_adaptive']['color']
+for long, ls, ms, alpha in ((1.5, (0, (3, 1.5)), 3.2, .55), (2., '-', 4.2, 1.)):
+    pts = [tradeoff_point(k, long) for k in (2, 3, 4, 5)]
+    ax.plot([p[0] for p in pts], [p[1] for p in pts], color=blue, ls=ls, lw=1.3, marker='o', ms=ms, alpha=alpha,
+            mec='white', mew=.6, zorder=3)
+    if long == 2.:
+        for k, (x, y, fa) in zip((2, 3, 4, 5), pts):
+            dx, dy, ha = {2: (-.4, -6.5, 'right'), 3: (1.2, 1.0, 'left'), 4: (1.0, 1.2, 'left'), 5: (1.0, -.4, 'left')}[k]
+            ax.text(x + dx, y + dy, f'$k$={k} ({fa:.0f}%)', fontsize=6.2, color=INK, ha=ha, va='center')
+        fx, fy, _ = pts[1]
+        ax.plot(fx, fy, marker='o', ms=8.5, mfc='none', mec=INK, mew=.8, zorder=4)
+    else:
+        x, y, _ = pts[0]
+        ax.text(x, y + 3.8, r'$k$=2, $\beta_{\rm long}$=1.5', fontsize=6.2, color=MUTED, ha='center', va='center')
+for rho in ('0.5', '0.6'):
+    x, y, _ = tradeoff_point(3, 2., rho)
+    ax.plot(x, y, marker='D', ms=3.6, mfc='white', mec=blue, mew=.9, zorder=3)
+x5, y5, _ = tradeoff_point(3, 2., '0.5')
+ax.text(x5 - .9, y5 - 3.0, 'failure-rate\nrule', fontsize=6.2, color=MUTED, ha='right', va='center', linespacing=.95)
+refs = [('observable_cooldown', 'Linear cooldown', (-1.0, 0., 'right')), ('exponential', 'Exponential', (-1.0, 0., 'right')),
+        ('immediate', 'Immediate', (0., -5.5, 'center'))]
+for pol, label, (dx, dy, ha) in refs:
+    st = STYLE[pol]
+    x, y = reference_point(lambda s, t, p=pol: held[(t, s, p)])
+    ax.plot(x, y, marker=st['marker'], color=st['color'], ms=5.5, mew=1.1, ls='none', zorder=3,
+            mec='white' if st['marker'] != 'x' else st['color'])
+    ax.text(x + dx, y + dy, label, fontsize=6.2, color=INK, ha=ha, va='center')
+x, y = reference_point(lambda s, t: switch[(s, t, 'perfect_detection')])
+ax.plot(x, y, marker='*', ms=7.5, mfc='white', mec=INK, mew=.8, ls='none', zorder=3)
+ax.text(x, y - 6.0, 'Perfect detection (bound)', fontsize=6.2, color=INK, ha='center', va='center')
+ax.set_xlim(66, 98)
+ax.set_ylim(10, 84)
+ax.set_xticks([70, 75, 80, 85, 90, 95])
+ax.set_yticks([20, 40, 60, 80])
+ax.set_xlabel('Independent faults: mean of IID 27% and tight 17% (%)')
+ax.set_ylabel('Extended outage (%)')
+ax.grid(color=GRID, lw=.5)
+ax.tick_params(length=2, pad=1.5)
+for side in ('top', 'right'):
+    ax.spines[side].set_visible(False)
+fig.subplots_adjust(left=.13, right=.99, bottom=.2, top=.98)
+save(fig, 'tradeoff')
 
 print('figures written')

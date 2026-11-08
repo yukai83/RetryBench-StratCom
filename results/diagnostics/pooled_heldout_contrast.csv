@@ -1,0 +1,6 @@
+policy,mean_pct,mean_shortfall_pp,worst_shortfall_pp,worst_cell,lowest_cell_pct,history_minus_policy_pp,ci_low,ci_high,cells_history_ahead,history_minus_policy_outside_outage_pp,cells_history_ahead_outside_outage
+immediate,68.17,20.37,100,communications_situation_report/held_quota_23,0,12.37,11.0,13.7,5,8.46,2
+exponential,74.2,14.33,52.0,communications_situation_report/held_outage_extended,18.5,6.33,5.33,7.33,7,0.67,4
+observable_cooldown,80.8,7.73,26.0,live_fact_check_support/held_tight_17,65.0,-0.27,-1.67,1.23,12,4.96,12
+sdk_style_proxy,74.07,14.47,52.0,communications_situation_report/held_outage_extended,18.5,6.47,5.43,7.53,10,0.83,7
+history_adaptive,80.53,8.0,26.5,live_fact_check_support/held_outage_extended,39.5,,,,,,

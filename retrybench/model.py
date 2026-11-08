@@ -139,8 +139,14 @@ class Scenario:
     adaptive_threshold: int = 2
     adaptive_short_s: float = 0.35
     adaptive_long_s: float = 1.5
+    # Load feedback (revision, Section V-D). Each request that reaches the
+    # service during an outage postpones that outage's end by this many seconds,
+    # so retries sent into an outage prolong it. 0 = pre-scheduled outages.
+    outage_load_delay_s: float = 0.0
 
     def __post_init__(self) -> None:
+        if self.outage_load_delay_s < 0:
+            raise ValueError('Outage load delay must be non-negative')
         if not 0 <= self.failure_prob <= 1 or not 0 <= self.permanent_prob <= 1:
             raise ValueError('Failure probabilities must be in [0,1]')
         if (self.adaptive_window_s <= 0 or self.adaptive_threshold < 1 or

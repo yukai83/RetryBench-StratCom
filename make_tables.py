@@ -2,7 +2,8 @@
 
 tables/heldout_all.tex     - held-out timely fresh delivery, all workflows and policies
 tables/label_masking.tex   - label-masking control (results/label_masking)
-tables/switching.tex       - switching ablation (results/diagnostics)
+tables/switching.tex       - switching ablation (results/diagnostics); supplementary since the revision
+tables/load_coupling.tex   - load-coupled outages, Table IV (results/load_coupling)
 """
 from pathlib import Path
 import csv
@@ -117,4 +118,33 @@ for cond, label in [('held_outage_extended', 'Extended outage'), ('held_tight_17
 lines[-1] += r'\bottomrule'
 lines += [r'\end{tabular}', r'\end{table}']
 (OUT / 'switching.tex').write_text('\n'.join(lines) + '\n')
+
+# Load-coupled outages (revision): pooled over the three workflows.
+load = {(float(r['extension_s']), float(r['delta_s']), r['policy']): r
+        for r in read(ROOT / 'results/load_coupling/load_coupling_summary.csv') if r['template'] == 'pooled'}
+deltas = sorted({d for _, d, _ in load})
+LOAD_POL = [('exponential', 'Exp.'), ('observable_cooldown', 'Cool.'), ('history_adaptive', 'Hist.')]
+imm = {float(r['success_pct']) for k, r in load.items() if k[2] == 'immediate'}
+assert len(imm) == 1, 'immediate retry is expected to be unaffected by load feedback'
+sdk_gap = max(abs(float(load[(e, d, 'sdk_style_proxy')]['success_pct']) - float(load[(e, d, 'exponential')]['success_pct']))
+              for e in (0., 2.) for d in deltas)
+lines = [r'\begin{table}[t]', r'\centering',
+         r'\caption{Load-coupled outages (post hoc): timely fresh delivery (\%), pooled over workflows '
+         r'(600 runs per cell). Each request received during an outage delays its end by $\delta$~s. '
+         f'Immediate retry: {imm.pop():.1f}\\% throughout; SDK-style proxy within {sdk_gap:.1f} points of Exp. '
+         r'Bold: best per row and outage length.}',
+         r'\label{tab:load}', r'\scriptsize', r'\setlength{\tabcolsep}{4pt}',
+         r'\begin{tabular}{@{}lrrrcrrr@{}}\toprule',
+         r' & \multicolumn{3}{c}{Development length} && \multicolumn{3}{c}{Extended (+2~s)}\\',
+         r'\cmidrule(lr){2-4}\cmidrule(lr){6-8}',
+         r'$\delta$ (s) & ' + ' && '.join(' & '.join(a for _, a in LOAD_POL) for _ in range(2)) + r'\\\midrule']
+for d in deltas:
+    groups = []
+    for e in (0., 2.):
+        vals = [float(load[(e, d, p)]['success_pct']) for p, _ in LOAD_POL]
+        groups.append(' & '.join(rf'\textbf{{{fmt(v)}}}' if v == max(vals) else fmt(v) for v in vals))
+    lines.append(f'{d:g} & ' + ' && '.join(groups) + r'\\')
+lines[-1] += r'\bottomrule'
+lines += [r'\end{tabular}', r'\end{table}']
+(OUT / 'load_coupling.tex').write_text('\n'.join(lines) + '\n')
 print('tables written')

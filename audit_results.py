@@ -102,10 +102,45 @@ checks['perfect_detection_equals_short_only_without_outages'] = all(
     swk[(s, t, 'perfect_detection', seed)] == swk[(s, t, 'short_only', seed)]
     for (s, t, v, seed) in swk if v == 'short_only' and s != 'held_outage_extended')
 
+# D. Revision analyses: threshold sweep, development grid on held-out cells, load-coupled outages.
+trade = read(DIAG / 'threshold_tradeoff.csv')
+checks['tradeoff_rows'] = len(trade) == 18 * 3
+checks['tradeoff_frozen_rows_match_primary_cells'] = all(
+    math.isclose(float(r[f'success_pct_{t}']), history[(t, r['scenario'])])
+    for r in trade if r['frozen'] == '1' for t in ('information_environment_assessment', 'live_fact_check_support', 'communications_situation_report'))
+devho = read(DIAG / 'devgrid_heldout.csv')
+checks['devgrid_heldout_size'] = len(devho) == 12 * 15
+checks['devgrid_rank1_is_frozen_and_matches_primary'] = all(
+    (int(r['threshold']), float(r['short_s']), float(r['long_s'])) == (3, .4, 2.) and
+    math.isclose(float(r['success_pct']), history[(r['template'], r['scenario'])]) for r in devho if r['dev_rank'] == '1')
+LOAD = ROOT / 'results/load_coupling'
+lt = read(LOAD / 'load_coupling_trials.csv')
+checks['load_coupling_count'] = len(lt) == 6 * 2 * 3 * 200 * 5
+checks['load_coupling_unique_keys'] = len({(r['extension_s'], r['delta_s'], r['template'], r['seed'], r['policy']) for r in lt}) == len(lt)
+sweep_key = {(float(r['extension_s']), r['template'], r['policy'], r['seed']): r['success'] for r in sweep}
+checks['load_delta0_matches_outage_sweep_seed_for_seed'] = all(
+    sweep_key[(float(r['extension_s']), r['template'], r['policy'], r['seed'])] == r['success'] for r in lt if float(r['delta_s']) == 0.)
+checks['load_prolongation_is_delta_times_outage_requests'] = all(
+    math.isclose(float(r['outage_prolonged_s']), float(r['delta_s']) * int(r['outage_requests']), abs_tol=1e-6) for r in lt)
+lcell = collections.defaultdict(list)
+for r in lt:
+    lcell[(r['extension_s'], r['delta_s'], r['template'], r['policy'])].append(int(r['success']))
+    lcell[(r['extension_s'], r['delta_s'], 'pooled', r['policy'])].append(int(r['success']))
+checks['load_summary_recomputed'] = all(
+    math.isclose(100 * mean(lcell[(r['extension_s'], r['delta_s'], r['template'], r['policy'])]), float(r['success_pct']), abs_tol=.01)
+    for r in read(LOAD / 'load_coupling_summary.csv'))
+ml = read(LOAD / 'label_masking_under_load.csv')
+table1 = {(r['template'], r['scenario'], r['policy']): float(r['fresh_pct']) for r in read(MASK / 'label_masking_summary.csv')}
+checks['label_masking_under_load_delta0_matches_table1'] = all(
+    math.isclose(float(r['fresh_pct']), table1[(r['template'], {'visible': 'outage_labeled', 'masked': 'outage_hidden_5xx'}[r['label']], r['policy'])])
+    for r in ml if float(r['delta_s']) == 0.)
+
 assert all(checks.values()), {k: v for k, v in checks.items() if not v}
 (ROOT / 'results' / 'audit.json').write_text(json.dumps({
     'checks': checks, 'all_pass': True,
     'trials': {'label_masking': len(lm), 'development': 12 * 360, 'heldout': len(held), 'unseen_dag': len(unseen),
-               'history_window': len(window), 'outage_sweep': len(sweep), 'switching_ablation': len(sw), 'localhost_http': len(http)},
+               'history_window': len(window), 'outage_sweep': len(sweep), 'switching_ablation': len(sw), 'localhost_http': len(http),
+               'threshold_tradeoff': len(trade) * 200 * 3, 'devgrid_heldout': len(devho) * 200, 'load_coupling': len(lt),
+               'label_masking_under_load': sum(int(r['n']) for r in ml)},
     'important': 'Synthetic simulations only; localhost HTTP uses injected faults, not provider traces'}, indent=2))
 print(json.dumps(checks, indent=2))

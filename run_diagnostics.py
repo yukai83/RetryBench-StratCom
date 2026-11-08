@@ -1,4 +1,4 @@
-"""Post-hoc diagnostics reported in the paper (Table IV, Fig. 3 and Section V).
+"""Post-hoc diagnostics reported in the paper (Figs. 1-2 and Section V).
 
 Every analysis here is post hoc and exploratory. None of them changes the
 frozen controller configuration in results/main/frozen_parameters.json, and
@@ -25,6 +25,15 @@ Outputs (results/diagnostics/):
       The frozen controller against its own two waits used alone (short only,
       long only) and against perfect outage detection with the same waits, with
       linear cooldown and immediate retry rerun as references.
+  threshold_tradeoff.csv  (revision; Fig. 1)
+      The controller with k in 2..5 and beta_long in 1..3 (beta_short, W fixed), plus a
+      circuit-breaker-style failure-rate rule, on three held-out regimes. The hidden label scores
+      each long/short choice as a false alarm or a detection.
+  devgrid_heldout.csv  (revision; Section V-A)
+      Every development-grid setting rerun on all fifteen held-out cells, to show how much the
+      frozen choice mattered. Never used to change it.
+  pooled_heldout_contrast.csv  (revision; Section V-A)
+      History-adaptive against each baseline over all fifteen held-out cells, bootstrap over seeds.
 
 Run from the project root:  python run_diagnostics.py
 """
@@ -305,6 +314,123 @@ def switching_ablation():
     return summary
 
 
+TRADEOFF_SCENARIOS = ('held_iid_27', 'held_tight_17', 'held_outage_extended')
+TRADEOFF_CONFIGS = ([(k, long, None) for k in (2, 3, 4, 5) for long in (1., 1.5, 2., 3.)] +
+                    [(3, 2., rho) for rho in (.5, .6)])
+
+
+def tradeoff_hook(k, rho, record):
+    """Controller with threshold k and, optionally, a failure-rate rule.
+
+    With rho set, the long wait also requires that at least a fraction rho of the
+    completed responses in the window failed, as in a circuit breaker's failure-rate
+    threshold. The state is recorded so that the hidden cause can score it afterwards.
+    """
+    def hook(policy, ctx):
+        if policy == 'history_adaptive':
+            high = ctx.recent_errors >= k and (rho is None or ctx.recent_errors >= rho * ctx.recent_total)
+            ctx = dataclasses.replace(ctx, adaptive_threshold=k, recent_errors=k if high else 0)
+            decision = policy_decide(policy, ctx)
+            record.append((high, decision.retry))
+            return decision
+        return policy_decide(policy, ctx)
+    return hook
+
+
+def threshold_tradeoff():
+    """False alarms against outage detection as k, beta_long and a failure-rate rule vary (beta_short, W fixed)."""
+    rows = []
+    for k, long, rho in TRADEOFF_CONFIGS:
+        for name in TRADEOFF_SCENARIOS:
+            sc = next(s for s in HELD_OUT if s.name == name)
+            cfg = dataclasses.replace(sc, adaptive_threshold=k, adaptive_short_s=TUNED['adaptive_short_s'], adaptive_long_s=long)
+            counts = collections.Counter()
+            ys = {}
+            for template in TEMPLATES:
+                y = []
+                for seed in TEST_SEEDS:
+                    record = []
+                    simmod.decide = tradeoff_hook(k, rho, record)
+                    try:
+                        m, res = simulate_assessment(workload_for(seed, template, sc), cfg, 'history_adaptive', log_events=True)
+                    finally:
+                        simmod.decide = policy_decide
+                    failures = [e for e in res.events if e['event'] == 'attempt_failure']
+                    if len(failures) != len(record):
+                        raise AssertionError('Decision/failure alignment broken')
+                    for f, (high, retried) in zip(failures, record):
+                        if retried and f['error'] in ('transient', 'timeout', 'outage'):
+                            counts[('outage' if f['error'] == 'outage' else 'independent', high)] += 1
+                    y.append(m.timely_evidence_complete)
+                ys[template] = 100 * mean(y)
+            share = lambda c: (round(100 * counts[(c, True)] / (counts[(c, True)] + counts[(c, False)]), 1)
+                               if counts[(c, True)] + counts[(c, False)] else '')
+            rows.append({'threshold': k, 'long_s': long, 'failure_rate_rule': '' if rho is None else rho, 'scenario': name,
+                         **{f'success_pct_{t}': round(v, 2) for t, v in ys.items()},
+                         'success_pct_pooled': round(mean(ys.values()), 2),
+                         'long_wait_pct_independent': share('independent'), 'long_wait_pct_outage': share('outage'),
+                         'retries_independent': counts[('independent', True)] + counts[('independent', False)],
+                         'retries_outage': counts[('outage', True)] + counts[('outage', False)],
+                         'frozen': int((k, long, rho) == (TUNED['adaptive_threshold'], TUNED['adaptive_long_s'], None))})
+    write_csv(OUT / 'threshold_tradeoff.csv', rows)
+    return rows
+
+
+def devgrid_on_heldout():
+    """Every development-grid setting on every held-out cell, to show how much the frozen choice mattered.
+
+    Post hoc: the frozen setting was chosen on development data before any held-out run, and this
+    table must not be used to choose another one.
+    """
+    dev = list(csv.DictReader((ROOT / 'results' / 'main' / 'development_grid.csv').open()))
+    cool = {(r['template'], r['scenario']): float(r['success_pct'])
+            for r in csv.DictReader((ROOT / 'results' / 'main' / 'heldout_summary.csv').open())
+            if r['split'] == 'held_out' and r['policy'] == 'observable_cooldown'}
+    rows = []
+    for rank, g in enumerate(dev, 1):
+        k, short, long = int(g['threshold']), float(g['short_s']), float(g['long_s'])
+        for sc in HELD_OUT:
+            cfg = dataclasses.replace(sc, adaptive_threshold=k, adaptive_short_s=short, adaptive_long_s=long)
+            for template in TEMPLATES:
+                y = [simulate_assessment(workload_for(seed, template, sc), cfg, 'history_adaptive')[0].timely_evidence_complete
+                     for seed in TEST_SEEDS]
+                pct = 100 * mean(y)
+                rows.append({'dev_rank': rank, 'threshold': k, 'short_s': short, 'long_s': long,
+                             'dev_score_pct': round(100 * float(g['score']), 2), 'scenario': sc.name, 'template': template,
+                             'success_pct': round(pct, 2), 'cooldown_pct': cool[(template, sc.name)],
+                             'at_least_cooldown': int(pct >= cool[(template, sc.name)])})
+    write_csv(OUT / 'devgrid_heldout.csv', rows)
+    return rows
+
+
+def pooled_heldout_contrast():
+    """History-adaptive against each baseline over all fifteen held-out cells, resampling seeds jointly."""
+    held = list(csv.DictReader((ROOT / 'results' / 'main' / 'heldout_workflow_trials.csv').open()))
+    y = {(r['template'], r['scenario'], r['policy'], int(r['seed'])): int(r['success']) for r in held}
+    cells = [(t, s.name) for t in TEMPLATES for s in HELD_OUT]
+    rate = {(t, s, p): 100 * mean(y[(t, s, p, seed)] for seed in TEST_SEEDS) for t, s in cells for p in POLICIES}
+    best = {(t, s): max(rate[(t, s, p)] for p in POLICIES) for t, s in cells}
+    rows = []
+    for other in POLICIES:
+        shortfall = [best[c] - rate[(*c, other)] for c in cells]
+        worst = max(range(len(cells)), key=lambda i: shortfall[i])
+        row = {'policy': other, 'mean_pct': round(mean(rate[(*c, other)] for c in cells), 2),
+               'mean_shortfall_pp': round(mean(shortfall), 2), 'worst_shortfall_pp': round(shortfall[worst], 2),
+               'worst_cell': '/'.join(cells[worst]), 'lowest_cell_pct': round(min(rate[(*c, other)] for c in cells), 2)}
+        if other != 'history_adaptive':
+            diff = np.array([mean(y[(t, s, 'history_adaptive', seed)] - y[(t, s, other, seed)] for t, s in cells)
+                             for seed in TEST_SEEDS], dtype=float)
+            lo, hi = paired_ci(diff, 'pooled15' + other)
+            outside = [c for c in cells if c[1] != 'held_outage_extended']
+            row.update({'history_minus_policy_pp': round(100 * diff.mean(), 2), 'ci_low': lo, 'ci_high': hi,
+                        'cells_history_ahead': sum(rate[(*c, 'history_adaptive')] > rate[(*c, other)] for c in cells),
+                        'history_minus_policy_outside_outage_pp': round(mean(rate[(*c, 'history_adaptive')] - rate[(*c, other)] for c in outside), 2),
+                        'cells_history_ahead_outside_outage': sum(rate[(*c, 'history_adaptive')] > rate[(*c, other)] for c in outside)})
+        rows.append(row)
+    write_csv(OUT / 'pooled_heldout_contrast.csv', rows)
+    return rows
+
+
 if __name__ == '__main__':
     OUT.mkdir(parents=True, exist_ok=True)
     summary, paired = outage_duration_sweep()
@@ -313,6 +439,9 @@ if __name__ == '__main__':
     guard = slack_guard_ablation()
     cap = sdk_proxy_cap_binding()
     switch = switching_ablation()
+    tradeoff = threshold_tradeoff()
+    pooled = pooled_heldout_contrast()
+    devgrid = devgrid_on_heldout()
     frozen_row = next(r for r in grid if (r['threshold'], r['short_s'], r['long_s']) == (3, .4, 2.))
     manifest = {
         'status': 'post-hoc exploratory diagnostics; frozen configuration unchanged',
@@ -326,6 +455,12 @@ if __name__ == '__main__':
         'sdk_proxy_trials': sum(r['n'] for r in cap),
         'switching_ablation_trials': sum(r['n'] for r in switch),
         'switching_note': 'perfect_detection reads the true outage label by design; it is an upper bound, not a deployable policy',
+        'threshold_tradeoff': {'configs': len(TRADEOFF_CONFIGS), 'scenarios': list(TRADEOFF_SCENARIOS),
+                               'trials': len(TRADEOFF_CONFIGS) * len(TRADEOFF_SCENARIOS) * len(TEMPLATES) * len(TEST_SEEDS),
+                               'note': 'post hoc on held-out seeds; beta_short and W fixed at the frozen values; not used for selection'},
+        'pooled_heldout_contrast_note': 'mean over the 15 held-out cells per seed, bootstrap over the 200 seeds',
+        'devgrid_heldout': {'configs': len({r['dev_rank'] for r in devgrid}), 'trials': len(devgrid) * len(TEST_SEEDS),
+                            'note': 'post hoc; shows sensitivity of the frozen choice, never used to change it'},
     }
     (OUT / 'diagnostics_manifest.json').write_text(json.dumps(manifest, indent=2))
     print(json.dumps(manifest, indent=2))

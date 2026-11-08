@@ -1,0 +1,29 @@
+{
+  "status": "post-hoc exploratory; frozen configuration unchanged",
+  "load_model": "each request received during an outage postpones that outage window's end by delta_s simulated seconds",
+  "deltas_s": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.5,
+    1.0
+  ],
+  "outage_extensions_s": [
+    0.0,
+    2.0
+  ],
+  "seeds": "91000..91199",
+  "trials": 36000,
+  "label_masking_trials": 28800,
+  "label_masking_seeds": "2026..2225",
+  "frozen_configuration": {
+    "threshold": 3,
+    "short_s": 0.4,
+    "long_s": 2.0,
+    "n": 360,
+    "score": 0.9611111111111111,
+    "mean_calls": 11.397222222222222
+  },
+  "not_modelled": "fleet-level queueing or self-sustaining overload; one workflow per trial"
+}

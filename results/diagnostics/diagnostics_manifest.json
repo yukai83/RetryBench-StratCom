@@ -31,5 +31,21 @@
   "sdk_proxy_same_as_exponential_trials": 2996,
   "sdk_proxy_trials": 3000,
   "switching_ablation_trials": 18000,
-  "switching_note": "perfect_detection reads the true outage label by design; it is an upper bound, not a deployable policy"
+  "switching_note": "perfect_detection reads the true outage label by design; it is an upper bound, not a deployable policy",
+  "threshold_tradeoff": {
+    "configs": 18,
+    "scenarios": [
+      "held_iid_27",
+      "held_tight_17",
+      "held_outage_extended"
+    ],
+    "trials": 32400,
+    "note": "post hoc on held-out seeds; beta_short and W fixed at the frozen values; not used for selection"
+  },
+  "pooled_heldout_contrast_note": "mean over the 15 held-out cells per seed, bootstrap over the 200 seeds",
+  "devgrid_heldout": {
+    "configs": 12,
+    "trials": 36000,
+    "note": "post hoc; shows sensitivity of the frozen choice, never used to change it"
+  }
 }

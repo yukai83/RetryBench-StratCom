@@ -70,3 +70,36 @@ def test_switch_hook_pins_or_oracles_the_wait_and_leaves_other_policies_alone():
     assert d.switch_hook('adaptive')('history_adaptive', transient) == decide('history_adaptive', transient)
     for pol in ('immediate', 'exponential', 'observable_cooldown', 'sdk_style_proxy'):
         assert d.switch_hook('long_only')(pol, transient) == decide(pol, transient)
+
+
+def test_tradeoff_hook_reproduces_frozen_controller_and_applies_rate_rule():
+    tuned = dict(adaptive_threshold=3, adaptive_short_s=.4, adaptive_long_s=2.)
+    record = []
+    for errors, total in ((2, 6), (3, 6), (5, 12)):
+        c = ctx(recent_errors=errors, recent_total=total, **tuned)
+        assert d.tradeoff_hook(3, None, record)('history_adaptive', c) == decide('history_adaptive', c)
+    rate = d.tradeoff_hook(3, .5, record)
+    assert rate('history_adaptive', ctx(recent_errors=3, recent_total=10, **tuned)).delay_s == .4
+    assert rate('history_adaptive', ctx(recent_errors=3, recent_total=5, **tuned)).delay_s == 2.
+    for pol in ('immediate', 'exponential', 'observable_cooldown', 'sdk_style_proxy'):
+        c = ctx(recent_errors=9, recent_total=9, **tuned)
+        assert rate(pol, c) == decide(pol, c)
+
+
+def test_tradeoff_frozen_rows_match_primary_cells_and_detector():
+    import csv
+    root = Path(__file__).resolve().parents[1] / 'results'
+    path = root / 'diagnostics' / 'threshold_tradeoff.csv'
+    if not path.exists():
+        pytest.skip('run run_diagnostics.py first')
+    frozen = [r for r in csv.DictReader(path.open()) if r['frozen'] == '1']
+    held = {(r['template'], r['scenario']): float(r['success_pct']) for r in csv.DictReader((root / 'main' / 'heldout_summary.csv').open())
+            if r['split'] == 'held_out' and r['policy'] == 'history_adaptive'}
+    det = {(r['scenario'], r['true_cause']): r for r in csv.DictReader((root / 'diagnostics' / 'detector_diagnostic.csv').open())}
+    assert len(frozen) == len(d.TRADEOFF_SCENARIOS)
+    for r in frozen:
+        for t in d.TEMPLATES:
+            assert float(r[f'success_pct_{t}']) == held[(t, r['scenario'])]
+        indep = [det[(r['scenario'], c)] for c in ('transient', 'timeout') if (r['scenario'], c) in det]
+        share = 100 * sum(int(x['long_wait_retries']) for x in indep) / sum(int(x['scheduled_retries']) for x in indep)
+        assert abs(share - float(r['long_wait_pct_independent'])) < .06

@@ -5,7 +5,9 @@ Three layers:
   2. design claims  - each quoted setting is read from the code or the frozen configuration;
   3. coverage audit - every number that appears in the prose (tables, figures, equations and
                       references excluded) must belong to a claim checked in layer 1 or 2.
-Tables I and III are generated from the CSVs by make_tables.py and are not re-checked here.
+Tables I, III and IV and Figs. 1-2 are generated from the CSVs by make_tables.py / make_figures.py and are not
+re-checked here. Three statements about third-party libraries (AWS SDK retry quota, Resilience4j defaults) come
+from their documentation, cited in the paper; they are listed below with the arithmetic that uses them.
 Run from the project root after the experiment scripts:  python verify_paper_numbers.py
 """
 import csv, json, re, inspect
@@ -75,6 +77,21 @@ plus0 = [sweep[(0., t, 'observable_cooldown')] for t in T3]
 graphs = ('chain', 'fanout', 'layered')
 unseen = {p: [ud(g, 'newgraph_outage', p) for g in graphs] for p in ('history_adaptive', 'exponential', 'immediate', 'observable_cooldown')}
 unseen_gain = [pair[('unseen_dag', g, 'newgraph_outage', 'exponential')][0] for g in graphs]
+# Revision analyses: pooled contrast, development grid on held-out cells, threshold sweep, load coupling.
+pooled = {r['policy']: r for r in read('results/diagnostics/pooled_heldout_contrast.csv')}
+devho = read('results/diagnostics/devgrid_heldout.csv')
+trade = read('results/diagnostics/threshold_tradeoff.csv')
+tr = lambda k, long, sc, rho='': next(r for r in trade if (int(r['threshold']), float(r['long_s']), r['failure_rate_rule'], r['scenario']) == (k, long, rho, sc))
+load = {(float(r['extension_s']), float(r['delta_s']), r['template'], r['policy']): r for r in read('results/load_coupling/load_coupling_summary.csv')}
+loadp = {(float(r['extension_s']), float(r['delta_s']), r['template'], r['compared_with']): tuple(float(r[k]) for k in ('difference_pp', 'ci_low', 'ci_high'))
+         for r in read('results/load_coupling/load_coupling_paired.csv')}
+maskload = {(float(r['delta_s']), r['label'], r['template'], r['policy']): float(r['fresh_pct']) for r in read('results/load_coupling/label_masking_under_load.csv')}
+load_manifest = json.loads((ROOT / 'results/load_coupling/load_coupling_manifest.json').read_text())
+DELTAS = sorted({d for _, d, _, _ in load})
+WAITING = ('exponential', 'sdk_style_proxy', 'observable_cooldown', 'history_adaptive')
+lp = lambda e, d, p: float(load[(e, d, 'pooled', p)]['success_pct'])
+swpool = lambda s, v: sum(sw[(s, t, v)] for t in T3) / 3
+pooled_dev = lambda rank: [r for r in devho if int(r['dev_rank']) == rank]
 src_stratcom = inspect.getsource(stratcom)
 src_model = inspect.getsource(model)
 ttls = [float(x) for x in re.findall(r'freshness_ttl_s=(\d+)', src_stratcom)]
@@ -96,8 +113,6 @@ CLAIMS = [
     (['1.5', '27'], 'worst history-minus-exponential cell (LFC, 27% IID)', (min(vs_exp), min((v, t, s) for t in T3 for s in SC for v in [hp(t, s, 'exponential')[0]])[1:]),
      (-1.5, (LFC, 'held_iid_27'))),
     (['21', '38', '21.0', '37.5'], 'outage gain over exponential, range', (min(out_exp), max(out_exp)), (21.0, 37.5)),
-    (['2', '5'], 'tight gain over exponential, range; CI excludes zero only in LFC',
-     ((min(v[0] for v in tight_exp), max(v[0] for v in tight_exp)), [excludes_zero(v) for v in tight_exp]), ((2.0, 5.0), [False, True, False])),
     (['74.0', '60.5'], 'IEA outage cooldown vs history', (ho(IEA, 'held_outage_extended', 'observable_cooldown'), ho(IEA, 'held_outage_extended', 'history_adaptive')), (74.0, 60.5)),
     (['95.0', '80.5'], 'IEA tight immediate vs history', (ho(IEA, 'held_tight_17', 'immediate'), ho(IEA, 'held_tight_17', 'history_adaptive')), (95.0, 80.5)),
     (['99.5', '0.0'], 'immediate quota LFC / CSR', (ho(LFC, 'held_quota_23', 'immediate'), ho(CSR, 'held_quota_23', 'immediate')), (99.5, 0.0)),
@@ -174,16 +189,17 @@ CLAIMS = [
     (['23', '41'], 'unseen paired gains range', (r0(min(unseen_gain)), r0(max(unseen_gain))), (23, 41)),
     (['0', '47'], 'unseen immediate range', (r0(min(unseen['immediate'])), r0(max(unseen['immediate']))), (0, 47)),
     (['one'], 'history within one point of cooldown on every graph', max(abs(a - b) for a, b in zip(unseen['history_adaptive'], unseen['observable_cooldown'])) < 1, True),
-    (['two'], 'proxy loses two chain workflows (IID)', r0((ud('chain', 'newgraph_iid', 'exponential') - ud('chain', 'newgraph_iid', 'sdk_style_proxy')) * 120 / 100), 2),
+    ([], 'proxy loses two chain workflows (IID); no longer quoted', r0((ud('chain', 'newgraph_iid', 'exponential') - ud('chain', 'newgraph_iid', 'sdk_style_proxy')) * 120 / 100), 2),
     # window sweep
     (['2', '12', '95.0', '87.0', '40.0', '63.0'], 'IEA window sweep endpoints',
      (win[(IEA, 'iid', 2.)], win[(IEA, 'iid', 12.)], win[(IEA, 'outage', 2.)], win[(IEA, 'outage', 12.)]), (95.0, 87.0, 40.0, 63.0)),
     # HTTP
-    (['100'], 'waiting policies 100% and immediate 0% in shared-fault HTTP regimes',
+    (['16'], 'waiting policies 16/16 and immediate 0/16 in shared-fault HTTP regimes',
      (all(float(http[(r, p)]['success_pct']) == 100 for r in ('brief_http_503_outage', 'shared_http_429') for p in ('exponential', 'sdk_style_proxy', 'observable_cooldown', 'history_adaptive')),
       all(float(http[(r, 'immediate')]['success_pct']) == 0 for r in ('brief_http_503_outage', 'shared_http_429'))), (True, True)),
-    (['one'], 'proxy stops one more HTTP workflow in IID and timeout regimes',
-     [round((float(http[(r, 'exponential')]['success_pct']) - float(http[(r, 'sdk_style_proxy')]['success_pct'])) * 16 / 100) for r in ('iid_http_503', 'timeout_http')], [1, 1]),
+    (['one'], 'HTTP IID and timeout regimes: policies differ by at most one run of 16',
+     [round((max(float(http[(r, p)]['success_pct']) for p in http_mod.POLICIES) - min(float(http[(r, p)]['success_pct']) for p in http_mod.POLICIES)) * 16 / 100)
+      for r in ('iid_http_503', 'timeout_http')], [1, 1]),
     # design and protocol settings, read from code or configuration
     (['6', '6.5'], 'history window 6 s; first outage window 6.5 s', (model.Scenario('x').adaptive_window_s, 'first + 6.5' in src_model), (6.0, True)),
     (['4.5', '7.5', '3.0', '19', '23', '0.2'], 'outage window placement and fast-fail latency',
@@ -212,7 +228,85 @@ CLAIMS = [
     (['3,600', '120', '8', '15', '18'], 'unseen-DAG design', (len(read('results/main/unseen_dag_trials.csv')), "{'chain':8,'fanout':15,'layered':18}" in inspect.getsource(run_main_study)), (3600, True)),
     (['320', '16', '35', '127.0.0.1'], 'HTTP design', (len(read('results/main/localhost_http_trials.csv')), len(http_mod.SEEDS), http_mod.SCALE), (320, 16, .035)),
     (['3,600'], 'window sweep trials', len(read('results/main/history_window_sensitivity.csv')), 3600),
-    (['87'], 'automated tests (pytest count)', None, None),  # checked separately below
+    (['98'], 'automated tests (pytest count)', None, None),  # checked separately below
+    # ---- revision: abstract and Section V-A (tie with the cooldown) ----
+    (['0.3', '1.7', '+1.2', '1.2'], 'history minus cooldown pooled over the 15 cells, seed bootstrap CI',
+     (round(float(pooled['observable_cooldown']['history_minus_policy_pp']), 1), float(pooled['observable_cooldown']['ci_low']), float(pooled['observable_cooldown']['ci_high'])),
+     (-0.3, -1.67, 1.23)),
+    ([], 'CI rounds to -1.7 and +1.2', (r1(float(pooled['observable_cooldown']['ci_low']) - 1e-9), round(float(pooled['observable_cooldown']['ci_high']), 1)), (-1.7, 1.2)),
+    (['twelve', '5.0'], 'history ahead of cooldown in all 12 cells outside the extended outage, by 5.0 on average',
+     (int(pooled['observable_cooldown']['cells_history_ahead_outside_outage']), r1(float(pooled['observable_cooldown']['history_minus_policy_outside_outage_pp']))), (12, 5.0)),
+    (['26.5', '26.0'], 'worst shortfall from the best policy: history (LFC outage) and cooldown (LFC tight)',
+     ((float(pooled['history_adaptive']['worst_shortfall_pp']), pooled['history_adaptive']['worst_cell']),
+      (float(pooled['observable_cooldown']['worst_shortfall_pp']), pooled['observable_cooldown']['worst_cell'])),
+     ((26.5, f'{LFC}/held_outage_extended'), (26.0, f'{LFC}/held_tight_17'))),
+    ([], 'losing only under that outage: cooldown beats history only in extended-outage cells',
+     sorted({s for t in T3 for s in SC if ho(t, s, 'observable_cooldown') > ho(t, s, 'history_adaptive')}), ['held_outage_extended']),
+    (['two', '0.8', '14', '15', '360', '1.5'], 'the two dev settings ranked next: ranks 2-3 (k=2, long 1.5) are 0.8 below the frozen score (3 of 360 trials) and match/beat the cooldown in 14 and 15 held-out cells',
+     ([(int(pooled_dev(r)[0]['threshold']), float(pooled_dev(r)[0]['long_s'])) for r in (2, 3)],
+      [r1(float(pooled_dev(1)[0]['dev_score_pct']) - float(pooled_dev(r)[0]['dev_score_pct'])) for r in (2, 3)],
+      [round((float(dev[0]['score']) - float(dev[r - 1]['score'])) * 360) for r in (2, 3)],
+      [sum(int(x['at_least_cooldown']) for x in pooled_dev(r)) for r in (2, 3)]),
+     ([(2, 1.5), (2, 1.5)], [0.8, 0.8], [3, 3], [14, 15])),
+    # ---- revision: switching ablation, pooled cost of false alarms ----
+    (['5.2', '3.5'], 'false alarms cost (short-only minus controller, pooled): tight 17%, IID 27%',
+     (r1(swpool('held_tight_17', 'short_only') - swpool('held_tight_17', 'adaptive')), r1(swpool('held_iid_27', 'short_only') - swpool('held_iid_27', 'adaptive'))), (5.2, 3.5)),
+    # ---- revision: threshold sweep (Fig. 2) ----
+    (['59', '26', '8', '2.5'], 'false alarms at 27% IID for k=2..5, long 2.0',
+     [r0(float(tr(k, 2., 'held_iid_27')['long_wait_pct_independent'])) if k != 5 else float(tr(k, 2., 'held_iid_27')['long_wait_pct_independent']) for k in (2, 3, 4, 5)], [59, 26, 8, 2.5]),
+    (['88', '64', '37', '25'], 'outage detection for k=2..5, long 2.0',
+     [r0(float(tr(k, 2., 'held_outage_extended')['long_wait_pct_outage'])) for k in (2, 3, 4, 5)], [88, 64, 37, 25]),
+    (['71.0', '50.5', '33.2', '28.3'], 'pooled extended-outage delivery for k=2..5, long 2.0',
+     [r1(float(tr(k, 2., 'held_outage_extended')['success_pct_pooled'])) for k in (2, 3, 4, 5)], [71.0, 50.5, 33.2, 28.3]),
+    (['24', '29'], 'false alarms at k=3 across long = 1..3', (r0(min(float(tr(3, l, 'held_iid_27')['long_wait_pct_independent']) for l in (1., 1.5, 2., 3.))),
+                                                            r0(max(float(tr(3, l, 'held_iid_27')['long_wait_pct_independent']) for l in (1., 1.5, 2., 3.)))), (24, 29)),
+    (['21.7'], 'k=3, long 1.0: long waits (6 s) do not outlast the 8.5-s window; outage delivery',
+     (sum(min(5, 1. * a) for a in (1, 2, 3)) < 6.5 + 2, r1(float(tr(3, 1., 'held_outage_extended')['success_pct_pooled']))), (True, 21.7)),
+    (['17', '35', '4'], 'failure-rate rule (rho 0.5, k=3) vs k=4: more false alarms, less detection',
+     (r0(float(tr(3, 2., 'held_iid_27', '0.5')['long_wait_pct_independent'])), r0(float(tr(3, 2., 'held_outage_extended', '0.5')['long_wait_pct_outage'])),
+      float(tr(3, 2., 'held_iid_27', '0.5')['long_wait_pct_independent']) > float(tr(4, 2., 'held_iid_27')['long_wait_pct_independent']) and
+      float(tr(3, 2., 'held_outage_extended', '0.5')['long_wait_pct_outage']) < float(tr(4, 2., 'held_outage_extended')['long_wait_pct_outage'])), (17, 35, True)),
+    (['5'], 'no sweep setting comes within 5 points of perfect detection on both axes (pooled; x = mean of IID 27% and tight 17%)',
+     min(max((swpool('held_iid_27', 'perfect_detection') + swpool('held_tight_17', 'perfect_detection')) / 2 -
+             (float(tr(k, l, 'held_iid_27', rho)['success_pct_pooled']) + float(tr(k, l, 'held_tight_17', rho)['success_pct_pooled'])) / 2,
+             swpool('held_outage_extended', 'perfect_detection') - float(tr(k, l, 'held_outage_extended', rho)['success_pct_pooled']))
+         for k, l, rho in [(int(r['threshold']), float(r['long_s']), r['failure_rate_rule']) for r in trade if r['scenario'] == 'held_iid_27']) > 5, True),
+    (['32,400'], 'threshold sweep trials', manifest['threshold_tradeoff']['trials'], 32400),
+    # ---- revision: load-coupled outages (Table IV, Section V-E) ----
+    (['2.8', '4.0'], 'mean requests sent into an outage, waiting policies, both lengths, all delta',
+     (r1(min(float(load[(e, d, 'pooled', p)]['mean_outage_requests']) for e in (0., 2.) for d in DELTAS for p in WAITING)),
+      r1(max(float(load[(e, d, 'pooled', p)]['mean_outage_requests']) for e in (0., 2.) for d in DELTAS for p in WAITING))), (2.8, 4.0)),
+    (['0.3', '69.8', '75.2', '32.5'], 'development length, delta 0.3: history, cooldown, exponential',
+     tuple(r1(lp(0., .3, p)) for p in ('history_adaptive', 'observable_cooldown', 'exponential')), (69.8, 75.2, 32.5)),
+    (['1'], 'delta 0.3 adds about 1 s of outage (mean prolongation, waiting policies)',
+     round(sum(float(load[(0., .3, 'pooled', p)]['mean_outage_prolonged_s']) for p in WAITING) / len(WAITING), 0), 1.0),
+    (['+1', '66.5', '75.3', '31.5'], 'outage sweep +1 s pooled: history, cooldown, exponential',
+     tuple(r1(sum(sweep_rate[(1., t, p)] for t in T3) / 3) for p in ('history_adaptive', 'observable_cooldown', 'exponential')), (66.5, 75.3, 31.5)),
+    (['98.0', '100'], 'quota: policies that honour Retry-After stay at 98.0-100%',
+     (min(ho(t, 'held_quota_23', p) for t in T3 for p in WAITING), max(ho(t, 'held_quota_23', p) for t in T3 for p in WAITING)), (98.0, 100.0)),
+    (['34'], 'label masking under load: visible minus masked (cause-aware) at least 34 points at every delta',
+     r0(min(maskload[(d, 'visible', t, 'budget_aware')] - maskload[(d, 'masked', t, 'budget_aware')] for d in DELTAS for t in T3)), 34),
+    ([], 'label masking under load: delta 0 reproduces Table I', all(maskload[(0., lab, t, p)] == obs[(t, sc, p)]
+     for lab, sc in (('visible', 'outage_labeled'), ('masked', 'outage_hidden_5xx')) for t in T3 for p in ('budget_aware', 'observable_cooldown', 'exponential', 'immediate')), True),
+    (['+3.5', '3.5', '2.2', '5.0'], 'history beats exponential at every delta and both lengths; smallest gain and CI',
+     (all(loadp[(e, d, 'pooled', 'exponential')][1] > 0 for e in (0., 2.) for d in DELTAS),
+      min((loadp[(e, d, 'pooled', 'exponential')] for e in (0., 2.) for d in DELTAS), key=lambda v: v[0])), (True, (3.5, 2.17, 5.0))),
+    (['6.0', '3.3', '8.8'], 'development length, delta 0: history minus cooldown and CI', loadp[(0., 0., 'pooled', 'observable_cooldown')], (6.0, 3.33, 8.84)),
+    (['0.2'], 'lead vanishes at delta 0.2 (CI spans zero)', excludes_zero(loadp[(0., .2, 'pooled', 'observable_cooldown')]), False),
+    (['0.3', '5.3', '9.0', '1.5'], 'reverses at delta >= 0.3 (CI below zero); value at 0.3',
+     (all(loadp[(0., d, 'pooled', 'observable_cooldown')][2] < 0 for d in DELTAS if d >= .3), loadp[(0., .3, 'pooled', 'observable_cooldown')]), (True, (-5.33, -9.0, -1.5))),
+    (['21.2', '22.5'], 'extended length: cooldown lead 21.2 at delta 0, narrows monotonically; immediate 22.5 throughout',
+     (round(-loadp[(2., 0., 'pooled', 'observable_cooldown')][0], 1),
+      all(-loadp[(2., a, 'pooled', 'observable_cooldown')][0] >= -loadp[(2., b, 'pooled', 'observable_cooldown')][0] for a, b in zip(DELTAS, DELTAS[1:])),
+      {lp(e, d, 'immediate') for e in (0., 2.) for d in DELTAS}), (21.2, True, {22.5})),
+    (['36,000'], 'load-coupling trials (not quoted in prose; manifest check)', load_manifest['trials'], 36000),
+    # ---- revision: third-party library facts (from the cited documentation) and the arithmetic built on them ----
+    (['2026', '14', '500', '50', '100'], 'AWS 2026 standard mode: 14 tokens per non-throttling retry, 500-token bucket, 50-ms base; Resilience4j minimum 100 calls (documentation)',
+     None, None),
+    (['30', '420'], 'max retries in one reporting workflow (3 per task, largest template) and their token cost',
+     (3 * max(len(stratcom.make_assessment_workload(1, t).tasks) for t in T3), 14 * 3 * max(len(stratcom.make_assessment_workload(1, t).tasks) for t in T3)), (30, 420)),
+    ([], '420 tokens cannot exhaust a 500-token bucket', 420 < 500, True),
+    (['72'], 'max calls of any workflow in the study (4 attempts x largest unseen DAG)', 4 * max(8, 15, 18), 72),
 ]
 STRUCTURAL = {'429', '503', '5xx', '95', '1', '2', '3', '6', '12', '0', '4', '5', '9', '10'}  # status codes, CI level, section/eq counters
 
@@ -229,8 +323,9 @@ for numbers, name, got, want in CLAIMS:
 import subprocess, sys
 out = subprocess.run([sys.executable, '-m', 'pytest', '-q', '--collect-only'], cwd=ROOT, capture_output=True, text=True).stdout
 n_tests = int(re.search(r'(\d+) tests? collected', out).group(1))
-print('OK  ' if n_tests == 87 else 'FAIL', 'automated tests', n_tests)
-if n_tests != 87:
+n_tests_ok = n_tests == 98 and f'{n_tests} automated tests' in (ROOT / 'main.tex').read_text()
+print('OK  ' if n_tests_ok else 'FAIL', 'automated tests (pytest count and the count quoted in main.tex)', n_tests)
+if not n_tests_ok:
     bad.append('tests')
 
 # Coverage audit of every number in the prose.
@@ -242,7 +337,7 @@ prose = re.sub(r'\\(cite|ref|label|input)\{[^}]*\}', ' ', prose)
 prose = re.sub(r'\\texttt\{127\.0\.0\.1\}', ' 127.0.0.1 ', prose)
 prose = prose.replace('{,}', ',').replace('\\%', '%')
 tokens = set(re.findall(r'(?<![\w.])(?:\+)?\d[\d,]*(?:\.\d+)?a?', re.sub(r'(\d),(?!\d{3})', r'\1 ', prose)))
-tokens |= set(w for w in re.findall(r'\b(one|two|four|Four|five|fifteen|two-thirds)\b', prose))
+tokens |= set(w for w in re.findall(r'\b(one|two|four|Four|five|fifteen|twelve|two-thirds)\b', prose))
 if '127.0.0.1' in prose:
     tokens = {t for t in tokens if t not in ('127.0', '127', '0.1', '0.0.1')} | {'127.0.0.1'}
 accounted = set(STRUCTURAL)

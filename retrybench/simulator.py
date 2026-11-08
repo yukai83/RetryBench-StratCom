@@ -93,6 +93,9 @@ def simulate(workload: Workload, scenario: Scenario, policy: PolicyName,
     retry_hints: dict[int, float] = {}
     # Completed HTTP outcomes only; time-windowed and reset on every workflow run.
     observed_history: list[tuple[float, str]] = []
+    # Per-run copy of the outage windows; with outage_load_delay_s > 0 their
+    # end times move later as requests arrive during them.
+    outages = [[a, b] for a, b in workload.outage_windows]
     optional_ids = {task.task_id for task in workload.tasks if task.criticality == 'optional'}
     required_ids = set(range(n)) - optional_ids
 
@@ -154,9 +157,11 @@ def simulate(workload: Workload, scenario: Scenario, policy: PolicyName,
             elif workload.permanent_draws[tid] < scenario.permanent_prob:
                 error = 'permanent'
                 latency = min(0.18, attempt.latency)
-            elif scenario.use_outages and any(a <= now < b for a, b in workload.outage_windows):
+            elif scenario.use_outages and (hit := next((w for w in outages if w[0] <= now < w[1]), None)):
                 error = 'outage'
                 latency = 0.2
+                # Load feedback: a request received during an outage delays recovery.
+                hit[1] += scenario.outage_load_delay_s
             elif attempt.latency >= scenario.timeout_s:
                 error = 'timeout'
                 latency = scenario.timeout_s

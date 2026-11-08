@@ -75,7 +75,7 @@ for i,p in enumerate(doc.paragraphs):
   for r in p.runs:r.text=r.text.replace('-bench','τ-bench')
 # Word title affiliation sourced from LaTex author block; pandoc often omits it.
 title=doc.paragraphs[0]
-author=title.insert_paragraph_before('Yukai Zeng | Singapore Ministry of Defence Communications Organisation (MCO)')
+author=title.insert_paragraph_before('Yukai Zeng* | Singapore Ministry of Defence Communications Organisation (MCO), Singapore | *Corresponding author: Zeng_Yukai@defence.gov.sg')
 author.alignment=WD_ALIGN_PARAGRAPH.CENTER
 for run in author.runs:run.font.name='Times New Roman';run.font.size=Pt(8)
 # Author was inserted before title: reposition just after title.
