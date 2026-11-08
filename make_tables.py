@@ -84,7 +84,8 @@ MASK_POL = [('immediate', 'Immediate'), ('exponential', 'Exponential backoff'),
 lines = [r'\begin{table}[t]', r'\centering',
          r'\caption{Label-masking control: timely fresh delivery (\%, 200 seeds) when the outage cause is visible to the policy '
          r'(Vis.) or reported as a generic 5xx (Mask.). ' + f'{_mask.deadline_s:g}-s deadline, {pct(_mask.failure_prob)} background errors, '
-         r'unextended outages.}',
+         r'unextended outages. IEA: information-environment assessment; LFC: live fact-check support; '
+         r'CSR: communications situation reporting.}',
          r'\label{tab:mask}', r'\scriptsize', r'\setlength{\tabcolsep}{3.5pt}',
          r'\begin{tabular}{@{}lrrcrrcrr@{}}\toprule',
          ' & ' + ' && '.join(rf'\multicolumn{{2}}{{c}}{{{abbr}}}' for _, abbr in TEMPLATES) + r'\\',
